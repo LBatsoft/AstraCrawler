@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # Redis 服务
+  redis:
+    image: redis:7-alpine
+    container_name: astracrawler-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API 服务
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: astracrawler-api
+    command: uvicorn astra_scheduler.api:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../logs:/app/logs
+
+  # Worker 节点 1
+  worker1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: astracrawler-worker-1
+    command: celery -A astra_farm.workers.playwright_worker worker --loglevel=info --concurrency=2 -Q high_priority,medium_priority
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - BROWSER_HEADLESS=true
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../logs:/app/logs
+
+  # Worker 节点 2
+  worker2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: astracrawler-worker-2
+    command: celery -A astra_farm.workers.playwright_worker worker --loglevel=info --concurrency=2 -Q medium_priority,low_priority
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - BROWSER_HEADLESS=true
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../logs:/app/logs
+
+  # Flower 监控面板
+  flower:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: astracrawler-flower
+    command: celery -A astra_scheduler.dispatcher flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis_data:
+
