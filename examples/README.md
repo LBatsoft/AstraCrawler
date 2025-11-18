@@ -1,56 +1,53 @@
 # AstraCrawler 示例脚本
 
-本目录包含 AstraCrawler 的各种使用示例。
+本目录包含 AstraCrawler 的使用示例。
 
 ## 示例列表
 
-### 1. demo_task.py
-基础任务提交示例，演示如何使用调度器提交爬取任务。
+### demo_get_encrypted_params.py
 
-```bash
-python examples/demo_task.py
-```
+获取加密参数的实际案例，演示如何使用 JsRpc 在实际场景中获取加密参数。
 
-### 2. demo_with_hooks.py
-带钩子脚本的爬取示例，演示如何注入 JavaScript 钩子脚本。
-
-```bash
-python examples/demo_with_hooks.py
-```
-
-### 3. demo_data_processing.py
-数据处理示例，演示如何使用数据处理管道提取和清洗数据。
-
-```bash
-python examples/demo_data_processing.py
-```
-
-### 4. demo_jsrpc.py
-JsRpc 集成示例，演示如何使用 JsRpc 进行前端加密破解。
+**功能**:
+- 获取签名参数
+- 模拟真实网站的加密破解流程
+- 批量获取多个页面的加密参数
+- 构建完整的 API 请求头
 
 **前置要求**:
 - JsRpc 服务端运行在 `ws://localhost:12080`
-- 可以从 https://github.com/jxhczhl/JsRpc 下载服务端
+- 可以使用 `tests/jsrpc_mock_server.py` 启动模拟服务端
+
+**运行方式**:
 
 ```bash
-# 1. 启动 JsRpc 服务端
-# 2. 运行示例
-python examples/demo_jsrpc.py
+# 方式 1: 手动启动服务端（推荐用于测试）
+# 终端 1: 启动 JsRpc 服务端
+python tests/jsrpc_mock_server.py
+
+# 终端 2: 运行示例
+python examples/demo_get_encrypted_params.py
+
+# 方式 2: 使用真实 JsRpc 服务端
+# 从 https://github.com/jxhczhl/JsRpc 下载并运行服务端
+# 然后运行示例
+python examples/demo_get_encrypted_params.py
 ```
 
-## 运行所有示例
-
-```bash
-# 确保 Redis 和 JsRpc 服务端正在运行
-python examples/demo_task.py
-python examples/demo_with_hooks.py
-python examples/demo_data_processing.py
-python examples/demo_jsrpc.py
-```
+**示例输出**:
+- Token 获取过程
+- 签名参数生成过程
+- 完整请求头构建
+- 批量请求处理
 
 ## 注意事项
 
-1. 运行示例前确保相关服务已启动（Redis、JsRpc 等）
-2. 某些示例需要网络连接访问目标网站
-3. JsRpc 示例需要单独启动 JsRpc 服务端
+1. 运行示例前确保 JsRpc 服务端正在运行
+2. 示例中使用无头浏览器模式（headless=True）
+3. 示例中的加密函数是模拟的，实际场景中需要找到真实网站中的函数
 
+## 参考文档
+
+- [JsRpc 集成指南](../docs/JSRPC_GUIDE.md)
+- [获取加密参数指南](../docs/ENCRYPT_PARAMS_GUIDE.md)
+- [真实场景使用指南](../docs/REAL_WORLD_USAGE.md)

@@ -20,12 +20,16 @@
     let reconnectAttempts = 0;
     let reconnectTimer = null;
     
+    // 暴露 ws 到全局，方便调试
+    window.__jsrpcWs = null;
+    
     /**
      * 连接 WebSocket
      */
     function connect() {
         try {
             ws = new WebSocket(jsrpcConfig.wsUrl);
+            window.__jsrpcWs = ws;  // 暴露到全局
             
             ws.onopen = function() {
                 console.log('[JsRpc] WebSocket 连接已建立');
@@ -38,6 +42,7 @@
                     name: jsrpcConfig.name
                 };
                 ws.send(JSON.stringify(registerMsg));
+                console.log('[JsRpc] 已发送注册消息:', registerMsg);
             };
             
             ws.onmessage = function(event) {
@@ -56,6 +61,7 @@
             ws.onclose = function() {
                 console.log('[JsRpc] WebSocket 连接已关闭');
                 ws = null;
+                window.__jsrpcWs = null;
                 
                 // 自动重连
                 if (reconnectAttempts < jsrpcConfig.maxReconnectAttempts) {
@@ -221,9 +227,13 @@
         };
     };
     
-    // 自动连接
+    // 自动连接（延迟一下确保服务端已启动）
     console.log('[JsRpc] 客户端脚本已加载，准备连接...');
-    connect();
+    // 使用 setTimeout 延迟连接，确保服务端已启动
+    setTimeout(function() {
+        console.log('[JsRpc] 开始连接 WebSocket...');
+        connect();
+    }, 500);
     
     // 导出到全局
     window.__jsrpc = {

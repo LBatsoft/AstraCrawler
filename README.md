@@ -102,6 +102,14 @@ print(f"任务 ID: {task.id}")
 - [架构文档](docs/ARCHITECTURE.md) - 系统架构设计说明
 - [逆向指南](docs/REVERSE_GUIDE.md) - JavaScript 钩子使用指南
 - [JsRpc 集成指南](docs/JSRPC_GUIDE.md) - JsRpc 使用和集成说明
+- [获取加密参数指南](docs/ENCRYPT_PARAMS_GUIDE.md) - 如何获取网站加密参数
+- [真实场景使用指南](docs/REAL_WORLD_USAGE.md) - 真实网站加密破解流程
+
+## 示例
+
+查看 [examples/](examples/) 目录获取使用示例：
+
+- `demo_get_encrypted_params.py` - 获取加密参数的完整示例
 
 ## 许可证
 

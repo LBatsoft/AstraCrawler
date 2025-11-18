@@ -55,8 +55,14 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+.pytest_cache/
 
 # Celery
 celerybeat-schedule
 celerybeat.pid
+
+# Temporary files
+*.tmp
+*.bak
+*~
 
