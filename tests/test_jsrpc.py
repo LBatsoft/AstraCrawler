@@ -16,12 +16,13 @@ async def test_jsrpc_client_connection():
     client = JsRpcClient(
         ws_url="ws://localhost:12080",
         group="test",
-        name="test_client"
+        name="test_client",
+        auto_reconnect=False  # 测试时禁用自动重连，防止服务端未启动导致卡死
     )
     
     try:
         # 尝试连接（如果服务端未运行会失败）
-        connected = await client.connect()
+        connected = await client.connect(timeout=1.0)
         
         if connected:
             # 测试执行简单代码
@@ -39,10 +40,13 @@ async def test_jsrpc_client_connection():
 @pytest.mark.asyncio
 async def test_jsrpc_execute_code():
     """测试执行 JavaScript 代码"""
-    client = JsRpcClient(ws_url="ws://localhost:12080")
+    client = JsRpcClient(
+        ws_url="ws://localhost:12080",
+        auto_reconnect=False
+    )
     
     try:
-        await client.connect()
+        await client.connect(timeout=1.0)
         
         # 测试执行代码
         code = """
@@ -63,10 +67,13 @@ async def test_jsrpc_execute_code():
 @pytest.mark.asyncio
 async def test_jsrpc_call_function():
     """测试调用浏览器中的函数"""
-    client = JsRpcClient(ws_url="ws://localhost:12080")
+    client = JsRpcClient(
+        ws_url="ws://localhost:12080",
+        auto_reconnect=False
+    )
     
     try:
-        await client.connect()
+        await client.connect(timeout=1.0)
         
         # 先注册一个函数
         register_code = """
@@ -88,10 +95,13 @@ async def test_jsrpc_call_function():
 
 def test_jsrpc_client_sync():
     """测试同步客户端"""
-    client = JsRpcClientSync(ws_url="ws://localhost:12080")
+    client = JsRpcClientSync(
+        ws_url="ws://localhost:12080",
+        auto_reconnect=False
+    )
     
     try:
-        client.connect()
+        client.connect(timeout=1.0)
         
         # 执行代码
         result = client.execute_code("Math.max(1, 2, 3)")
