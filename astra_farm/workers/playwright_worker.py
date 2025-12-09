@@ -7,13 +7,18 @@ import logging
 import asyncio
 from typing import Dict, Any, Optional
 from celery import Celery
+from celery.signals import worker_process_init, worker_process_shutdown
 from celery.exceptions import Retry
-from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+from playwright.async_api import async_playwright, Browser, BrowserContext, Page, Playwright
 
 from ..config import worker_config
 
 # 配置日志
 logger = logging.getLogger(__name__)
+
+# 全局变量，用于持久化浏览器实例
+_playwright: Optional[Playwright] = None
+_browser: Optional[Browser] = None
 
 # 创建 Celery 应用实例（与调度中心使用相同的配置）
 celery_app = Celery(
@@ -32,6 +37,56 @@ celery_app.conf.update(
     worker_prefetch_multiplier=worker_config.WORKER_PREFETCH_MULTIPLIER,
 )
 
+async def _init_browser():
+    """初始化全局浏览器实例"""
+    global _playwright, _browser
+    if _browser is None:
+        logger.info("正在初始化全局 Playwright 浏览器实例...")
+        _playwright = await async_playwright().start()
+        
+        browser_options = {
+            "headless": worker_config.BROWSER_HEADLESS,
+            "timeout": worker_config.BROWSER_TIMEOUT,
+        }
+        # 注意：这里我们启动一次浏览器，后续所有任务复用
+        # 如果需要支持不同类型的浏览器（firefox, webkit），可能需要更复杂的逻辑
+        _browser = await _playwright.chromium.launch(**browser_options)
+        logger.info("全局 Playwright 浏览器实例初始化完成")
+
+async def _close_browser():
+    """关闭全局浏览器实例"""
+    global _playwright, _browser
+    if _browser:
+        logger.info("正在关闭全局 Playwright 浏览器实例...")
+        await _browser.close()
+        _browser = None
+    
+    if _playwright:
+        await _playwright.stop()
+        _playwright = None
+
+@worker_process_init.connect
+def init_worker_process(**kwargs):
+    """
+    Worker 进程初始化信号处理
+    
+    在每个 Worker 子进程启动时初始化 Playwright 浏览器
+    """
+    # 异步初始化需要在事件循环中运行
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(_init_browser())
+
+@worker_process_shutdown.connect
+def shutdown_worker_process(**kwargs):
+    """
+    Worker 进程关闭信号处理
+    """
+    # 尝试优雅关闭
+    try:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(_close_browser())
+    except Exception as e:
+        logger.error(f"关闭浏览器实例时发生错误: {e}")
 
 async def _crawl_page_async(
     url: str,
@@ -49,15 +104,18 @@ async def _crawl_page_async(
     Returns:
         包含 URL、HTML 内容和其他元信息的字典
     """
+    global _browser
+    
     options = options or {}
     hook_scripts = hook_scripts or []
     
-    # 配置浏览器选项
-    browser_options = {
-        "headless": options.get("headless", worker_config.BROWSER_HEADLESS),
-        "timeout": options.get("timeout", worker_config.BROWSER_TIMEOUT),
-    }
-    
+    # 确保浏览器已初始化
+    if _browser is None:
+        logger.warning("浏览器实例未初始化，尝试重新初始化...")
+        await _init_browser()
+        if _browser is None:
+             raise RuntimeError("无法初始化 Playwright 浏览器")
+
     # 配置代理
     proxy = None
     if options.get("proxy") or worker_config.PROXY_URL:
@@ -69,66 +127,66 @@ async def _crawl_page_async(
             proxy_config["password"] = worker_config.PROXY_PASSWORD
         proxy = proxy_config
     
-    async with async_playwright() as p:
-        # 启动浏览器
-        browser: Browser = await p.chromium.launch(**browser_options)
+    context: Optional[BrowserContext] = None
+    try:
+        # 创建浏览器上下文
+        context_options = {}
+        if proxy:
+            context_options["proxy"] = proxy
         
-        try:
-            # 创建浏览器上下文
-            context_options = {}
-            if proxy:
-                context_options["proxy"] = proxy
-            
-            context: BrowserContext = await browser.new_context(**context_options)
-            
-            # 创建新页面
-            page: Page = await context.new_page()
-            
-            # 注入钩子脚本
-            for script in hook_scripts:
-                try:
-                    await page.add_init_script(script)
-                    logger.debug(f"已注入钩子脚本: {script[:50]}...")
-                except Exception as e:
-                    logger.warning(f"注入钩子脚本失败: {str(e)}")
-            
-            # 导航到目标 URL
-            logger.info(f"开始爬取: {url}")
-            response = await page.goto(url, wait_until="networkidle", timeout=30000)
-            
-            # 等待页面加载完成
-            await page.wait_for_load_state("domcontentloaded")
-            
-            # 获取页面内容
-            html_content = await page.content()
-            
-            # 获取页面元信息
-            title = await page.title()
-            url_final = page.url
-            
-            # 获取响应状态
-            status_code = response.status if response else None
-            
-            # 关闭上下文和浏览器
+        # 为每个任务创建独立的上下文
+        context = await _browser.new_context(**context_options)
+        
+        # 创建新页面
+        page: Page = await context.new_page()
+        
+        # 注入钩子脚本
+        for script in hook_scripts:
+            try:
+                await page.add_init_script(script)
+                logger.debug(f"已注入钩子脚本: {script[:50]}...")
+            except Exception as e:
+                logger.warning(f"注入钩子脚本失败: {str(e)}")
+        
+        # 导航到目标 URL
+        logger.info(f"开始爬取: {url}")
+        
+        # 使用 options 中的超时或默认超时
+        timeout = options.get("timeout", worker_config.BROWSER_TIMEOUT)
+        response = await page.goto(url, wait_until="networkidle", timeout=timeout)
+        
+        # 等待页面加载完成
+        await page.wait_for_load_state("domcontentloaded")
+        
+        # 获取页面内容
+        html_content = await page.content()
+        
+        # 获取页面元信息
+        title = await page.title()
+        url_final = page.url
+        
+        # 获取响应状态
+        status_code = response.status if response else None
+        
+        result = {
+            "url": url_final,
+            "original_url": url,
+            "status_code": status_code,
+            "title": title,
+            "html": html_content,
+            "success": True,
+        }
+        
+        logger.info(f"爬取成功: {url}, Status={status_code}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"爬取失败: {url}, Error={str(e)}")
+        raise
+    finally:
+        # 务必关闭上下文，释放资源，但不关闭 Browser
+        if context:
             await context.close()
-            await browser.close()
-            
-            result = {
-                "url": url_final,
-                "original_url": url,
-                "status_code": status_code,
-                "title": title,
-                "html": html_content,
-                "success": True,
-            }
-            
-            logger.info(f"爬取成功: {url}, Status={status_code}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"爬取失败: {url}, Error={str(e)}")
-            await browser.close()
-            raise
 
 
 @celery_app.task(
@@ -148,8 +206,7 @@ def crawl_page(
     """
     Celery 任务：爬取网页
     
-    Args:
-        self: Celery 任务实例（bind=True）
+    Args:1
         url: 目标 URL
         options: 爬取选项
         hook_scripts: 要注入的 JavaScript 钩子脚本
@@ -188,4 +245,3 @@ def crawl_page(
                 "error": str(exc),
                 "retries": self.request.retries,
             }
-

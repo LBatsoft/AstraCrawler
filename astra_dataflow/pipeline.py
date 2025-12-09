@@ -38,7 +38,19 @@ class DataPipeline:
         try:
             # 提取数据
             extractor = HTMLExtractor(html)
-            data = extractor.extract_all()
+            
+            # 优化：直接在提取时处理 URL 转换，避免重复调用 extractor 方法造成多次 DOM 遍历
+            # 我们通过组合方式手动调用需要的方法，而不是使用 extract_all
+            
+            data = {
+                "title": extractor.extract_title(),
+                "text": extractor.extract_text(),
+                "meta": extractor.extract_meta(),
+                "links": extractor.extract_links(absolute=True, base_url=url) if url else extractor.extract_links(),
+                "images": extractor.extract_images(absolute=True, base_url=url) if url else extractor.extract_images(),
+                "tables": extractor.extract_tables(),
+                "json_ld": extractor.extract_json_ld(),
+            }
             
             # 清洗文本数据
             if self.enable_cleaning and self.cleaner:
@@ -54,13 +66,6 @@ class DataPipeline:
             # 添加 URL 信息
             if url:
                 data["url"] = url
-                # 转换为绝对链接
-                if data.get("links"):
-                    extractor_base = HTMLExtractor(html)
-                    data["links"] = extractor_base.extract_links(absolute=True, base_url=url)
-                if data.get("images"):
-                    extractor_base = HTMLExtractor(html)
-                    data["images"] = extractor_base.extract_images(absolute=True, base_url=url)
             
             logger.info(f"数据处理完成: URL={url}")
             return data
@@ -68,4 +73,3 @@ class DataPipeline:
         except Exception as e:
             logger.error(f"数据处理失败: URL={url}, Error={str(e)}")
             raise
-
