@@ -8,20 +8,10 @@ import asyncio
 import logging
 import time
 from typing import Optional, Dict, Any, Callable
-try:
-    # 使用新版本 websockets API
-    from websockets.client import connect as ws_connect
-    from websockets.exceptions import ConnectionClosed
-except ImportError:
-    # 兼容旧版本 websockets
-    try:
-        from websockets import connect as ws_connect
-        from websockets.exceptions import ConnectionClosed
-    except ImportError:
-        # 如果都没有，使用 legacy API
-        import websockets
-        ws_connect = websockets.connect
-        ConnectionClosed = websockets.exceptions.ConnectionClosed
+
+# 使用新版本 websockets API
+from websockets.client import connect as ws_connect
+from websockets.exceptions import ConnectionClosed
 
 logger = logging.getLogger(__name__)
 

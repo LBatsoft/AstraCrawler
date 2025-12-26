@@ -38,6 +38,8 @@ class Config:
         # API 配置
         self.API_HOST = os.getenv("API_HOST", "0.0.0.0")
         self.API_PORT = int(os.getenv("API_PORT", "8000"))
+        # 简单的 API 密钥认证，如果未设置则不启用认证（开发模式）
+        self.API_KEY = os.getenv("API_KEY")
         
         # 日志配置
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

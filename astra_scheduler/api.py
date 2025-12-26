@@ -5,14 +5,35 @@
 """
 import logging
 from typing import Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Security, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, HttpUrl, Field
 
 from .dispatcher import schedule_task, get_task_status, get_task_result
 from .config import config
+import redis
 
 # 配置日志
 logger = logging.getLogger(__name__)
+
+# 安全认证
+security = HTTPBearer(auto_error=False)
+
+async def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = Security(security)):
+    """验证 API Key"""
+    if config.API_KEY:
+        if not credentials:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Missing authentication credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if credentials.credentials != config.API_KEY:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid API Key"
+            )
+    return credentials
 
 # 创建 FastAPI 应用
 app = FastAPI(
@@ -59,7 +80,7 @@ class SystemStatusResponse(BaseModel):
     workers: int
 
 
-@app.post("/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
+@app.post("/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(verify_api_key)])
 async def create_task(request: CrawlRequest):
     """
     提交新的爬取任务
@@ -92,7 +113,7 @@ async def create_task(request: CrawlRequest):
         )
 
 
-@app.get("/tasks/{task_id}", response_model=TaskStatusResponse)
+@app.get("/tasks/{task_id}", response_model=TaskStatusResponse, dependencies=[Depends(verify_api_key)])
 async def get_task(task_id: str):
     """
     查询任务状态
@@ -114,7 +135,7 @@ async def get_task(task_id: str):
         )
 
 
-@app.get("/tasks/{task_id}/result")
+@app.get("/tasks/{task_id}/result", dependencies=[Depends(verify_api_key)])
 async def get_result(task_id: str):
     """
     获取任务结果
@@ -143,7 +164,7 @@ async def get_result(task_id: str):
         )
 
 
-@app.get("/status", response_model=SystemStatusResponse)
+@app.get("/status", response_model=SystemStatusResponse, dependencies=[Depends(verify_api_key)])
 async def get_system_status():
     """
     获取系统运行状态
@@ -161,11 +182,20 @@ async def get_system_status():
         active_workers = len(active_queues)
         
         # 获取队列长度（需要 Redis 连接）
-        queues = {
-            config.QUEUE_HIGH: 0,
-            config.QUEUE_MEDIUM: 0,
-            config.QUEUE_LOW: 0,
-        }
+        try:
+            r = redis.from_url(config.CELERY_BROKER_URL)
+            queues = {
+                config.QUEUE_HIGH: r.llen(config.QUEUE_HIGH),
+                config.QUEUE_MEDIUM: r.llen(config.QUEUE_MEDIUM),
+                config.QUEUE_LOW: r.llen(config.QUEUE_LOW),
+            }
+        except Exception as e:
+            logger.error(f"Redis 连接失败: {str(e)}")
+            queues = {
+                config.QUEUE_HIGH: -1,
+                config.QUEUE_MEDIUM: -1,
+                config.QUEUE_LOW: -1,
+            }
         
         return SystemStatusResponse(
             status="running",
