@@ -32,6 +32,12 @@ class WorkerConfig:
         self.BROWSER_HEADLESS = os.getenv("BROWSER_HEADLESS", "true").lower() == "true"
         self.BROWSER_TIMEOUT = int(os.getenv("BROWSER_TIMEOUT", "30000"))  # 毫秒
         
+        # 浏览器底层定制配置
+        # 指定自定义 Chromium 可执行文件路径（如指纹浏览器内核）
+        self.BROWSER_EXECUTABLE_PATH = os.getenv("BROWSER_EXECUTABLE_PATH")
+        # 自定义启动参数（逗号分隔），例如: --disable-blink-features=AutomationControlled
+        self.BROWSER_ARGS = os.getenv("BROWSER_ARGS", "").split(",") if os.getenv("BROWSER_ARGS") else []
+        
         # 代理配置
         self.PROXY_URL = os.getenv("PROXY_URL")
         self.PROXY_USERNAME = os.getenv("PROXY_USERNAME")

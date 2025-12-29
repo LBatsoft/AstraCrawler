@@ -29,7 +29,11 @@
 2.  **反爬能力增强**:
     -   集成 `playwright-stealth`，自动隐藏自动化特征。
     -   实现自定义 User-Agent 设置，默认使用现代 Chrome UA。
-    -   受影响文件: `astra_farm/workers/playwright_worker.py`, `requirements.txt`
+    -   **底层定制**:
+        -   支持 `BROWSER_EXECUTABLE_PATH` 配置，允许加载自定义/去指纹 Chromium 内核。
+        -   新增 `cdp_fingerprint.py` 模块，通过 CDP 协议深度注入 UA Client Hints、WebGL 厂商信息。
+        -   禁用 `AutomationControlled` 等自动化特征标志。
+    -   受影响文件: `astra_farm/workers/playwright_worker.py`, `astra_farm/workers/cdp_fingerprint.py`
 
 ### 最近变更 (feat/high-priority-tasks)
 已完成高优先级任务：

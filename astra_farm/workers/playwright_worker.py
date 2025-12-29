@@ -18,6 +18,7 @@ except ImportError:
     HAS_STEALTH = False
 
 from ..config import worker_config
+from .cdp_fingerprint import inject_cdp_fingerprint
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -53,7 +54,17 @@ async def _init_browser():
         browser_options = {
             "headless": worker_config.BROWSER_HEADLESS,
             "timeout": worker_config.BROWSER_TIMEOUT,
+            "args": [
+                "--disable-blink-features=AutomationControlled",  # 禁用自动化特性
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+            ] + worker_config.BROWSER_ARGS
         }
+        
+        if worker_config.BROWSER_EXECUTABLE_PATH:
+            logger.info(f"使用自定义浏览器内核: {worker_config.BROWSER_EXECUTABLE_PATH}")
+            browser_options["executable_path"] = worker_config.BROWSER_EXECUTABLE_PATH
+            
         # 注意：这里我们启动一次浏览器，后续所有任务复用
         # 如果需要支持不同类型的浏览器（firefox, webkit），可能需要更复杂的逻辑
         _browser = await _playwright.chromium.launch(**browser_options)
@@ -168,6 +179,12 @@ async def _crawl_page_async(
         if HAS_STEALTH:
             await stealth_async(page)
             logger.debug("已启用 playwright-stealth 反爬模式")
+        
+        # 启用 CDP 深度指纹注入
+        await inject_cdp_fingerprint(page, {"user_agent": user_agent})
+        
+        # 移除 webdriver 属性（双重保险）
+        await page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         
         # 导航到目标 URL
         logger.info(f"开始爬取: {url}")
