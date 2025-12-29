@@ -10,6 +10,12 @@ from celery import Celery
 from celery.signals import worker_process_init, worker_process_shutdown
 from celery.exceptions import Retry
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page, Playwright
+# 尝试导入 playwright_stealth
+try:
+    from playwright_stealth import stealth_async
+    HAS_STEALTH = True
+except ImportError:
+    HAS_STEALTH = False
 
 from ..config import worker_config
 
@@ -127,10 +133,20 @@ async def _crawl_page_async(
             proxy_config["password"] = worker_config.PROXY_PASSWORD
         proxy = proxy_config
     
+    # User-Agent 配置
+    user_agent = options.get("user_agent")
+    if not user_agent:
+        # 默认使用通用浏览器 UA，或者后续从 UA 池中随机选择
+        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
     context: Optional[BrowserContext] = None
     try:
         # 创建浏览器上下文
-        context_options = {}
+        context_options = {
+            "user_agent": user_agent,
+            "viewport": {"width": 1920, "height": 1080},
+            "device_scale_factor": 1,
+        }
         if proxy:
             context_options["proxy"] = proxy
         
@@ -148,15 +164,30 @@ async def _crawl_page_async(
             except Exception as e:
                 logger.warning(f"注入钩子脚本失败: {str(e)}")
         
+        # 集成 playwright-stealth 反爬
+        if HAS_STEALTH:
+            await stealth_async(page)
+            logger.debug("已启用 playwright-stealth 反爬模式")
+        
         # 导航到目标 URL
         logger.info(f"开始爬取: {url}")
         
         # 使用 options 中的超时或默认超时
         timeout = options.get("timeout", worker_config.BROWSER_TIMEOUT)
-        response = await page.goto(url, wait_until="networkidle", timeout=timeout)
         
-        # 等待页面加载完成
-        await page.wait_for_load_state("domcontentloaded")
+        # 优化等待策略：默认 domcontentloaded，支持自定义选择器等待
+        wait_until = options.get("wait_until", "domcontentloaded")
+        wait_for_selector = options.get("wait_for_selector")
+        
+        response = await page.goto(url, wait_until=wait_until, timeout=timeout)
+        
+        # 如果指定了选择器，则额外等待选择器出现
+        if wait_for_selector:
+            try:
+                await page.wait_for_selector(wait_for_selector, timeout=timeout)
+                logger.debug(f"已等待选择器: {wait_for_selector}")
+            except Exception as e:
+                logger.warning(f"等待选择器超时: {wait_for_selector}, error: {str(e)}")
         
         # 获取页面内容
         html_content = await page.content()
