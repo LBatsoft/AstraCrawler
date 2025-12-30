@@ -20,6 +20,14 @@
 
 ## 2. 当前开发状态
 
+### 最近变更 (feat/data-loop)
+已完成 Hook 数据闭环和基础存储：
+1.  **Hook 数据提取**: Worker 自动提取 `window._hook_data`，支持自定义变量名。
+    -   受影响文件: `astra_farm/workers/playwright_worker.py`
+2.  **数据持久化**: `DataPipeline` 实现 JSONL 本地文件存储，自动按日期分片。
+    -   受影响文件: `astra_dataflow/pipeline.py`
+3.  **验证脚本**: 新增 `examples/verify_data_loop.py`，验证从注入到存储的全流程。
+
 ### 最近变更 (feat/worker-optimization)
 已完成 Worker 性能优化和反爬增强：
 1.  **等待策略优化**:
@@ -47,8 +55,8 @@
 ### 待办事项 (ToDo List)
 
 #### 中优先级 (Medium Priority)
-- [ ] **数据持久化**: 实现 `astra_dataflow/pipeline.py` 的存储逻辑 (DB/MQ)。
-- [ ] **Hook 数据提取**: 在 Worker (`playwright_worker.py`) 中自动提取 `window._hook_data` 并返回。
+- [x] **数据持久化**: 实现 `astra_dataflow/pipeline.py` 的存储逻辑 (DB/MQ)。
+- [x] **Hook 数据提取**: 在 Worker (`playwright_worker.py`) 中自动提取 `window._hook_data` 并返回。
 - [ ] **流控与代理**: 实现请求速率限制和代理池轮换。
 
 #### 低优先级 / 运维
