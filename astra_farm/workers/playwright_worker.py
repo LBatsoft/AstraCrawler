@@ -209,6 +209,20 @@ async def _crawl_page_async(
         # 获取页面内容
         html_content = await page.content()
         
+        # 提取 Hook 数据
+        # 默认提取 window._hook_data，也支持从 options 中指定变量名
+        hook_data_var = options.get("hook_data_var", "window._hook_data")
+        hook_data = None
+        try:
+            # 检查变量是否存在
+            handle = await page.evaluate_handle(f"typeof {hook_data_var} !== 'undefined' ? {hook_data_var} : null")
+            if handle:
+                hook_data = await handle.json_value()
+                if hook_data:
+                    logger.info(f"成功提取 Hook 数据: {len(str(hook_data))} bytes")
+        except Exception as e:
+            logger.warning(f"提取 Hook 数据失败 ({hook_data_var}): {str(e)}")
+        
         # 获取页面元信息
         title = await page.title()
         url_final = page.url
@@ -222,6 +236,7 @@ async def _crawl_page_async(
             "status_code": status_code,
             "title": title,
             "html": html_content,
+            "hook_data": hook_data,
             "success": True,
         }
         
