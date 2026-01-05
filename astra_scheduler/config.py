@@ -35,6 +35,10 @@ class Config:
         # 结果过期时间（秒）
         self.RESULT_EXPIRES = 3600
         
+        # 速率限制配置
+        # 默认每域名每分钟最大请求数
+        self.RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
+        
         # API 配置
         self.API_HOST = os.getenv("API_HOST", "0.0.0.0")
         self.API_PORT = int(os.getenv("API_PORT", "8000"))

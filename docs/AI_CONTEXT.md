@@ -20,6 +20,16 @@
 
 ## 2. 当前开发状态
 
+### 最近变更 (feat/rate-limit-proxy)
+已完成流控与代理池功能：
+1.  **速率限制 (Rate Limiting)**:
+    -   实现基于 Redis 滑动窗口算法的 `RateLimiter`。
+    -   在 Worker 中集成限流逻辑，自动根据域名进行每分钟请求限制。
+    -   受影响文件: `astra_scheduler/rate_limiter.py`, `astra_farm/workers/playwright_worker.py`
+2.  **简易代理池 (Proxy Pool)**:
+    -   实现 `ProxyPool` 模块，支持从环境变量 `PROXY_POOL` 读取代理列表并轮换。
+    -   受影响文件: `astra_farm/proxy_pool.py`, `astra_farm/workers/playwright_worker.py`
+
 ### 最近变更 (feat/data-loop)
 已完成 Hook 数据闭环和基础存储：
 1.  **Hook 数据提取**: Worker 自动提取 `window._hook_data`，支持自定义变量名。
@@ -57,7 +67,7 @@
 #### 中优先级 (Medium Priority)
 - [x] **数据持久化**: 实现 `astra_dataflow/pipeline.py` 的存储逻辑 (DB/MQ)。
 - [x] **Hook 数据提取**: 在 Worker (`playwright_worker.py`) 中自动提取 `window._hook_data` 并返回。
-- [ ] **流控与代理**: 实现请求速率限制和代理池轮换。
+- [x] **流控与代理**: 实现请求速率限制和代理池轮换。
 
 #### 低优先级 / 运维
 - [ ] **CI/CD**: 添加 GitHub Actions 配置文件。

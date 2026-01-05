@@ -19,9 +19,14 @@ except ImportError:
 
 from ..config import worker_config
 from .cdp_fingerprint import inject_cdp_fingerprint
+from astra_scheduler.rate_limiter import RateLimiter
+from astra_farm.proxy_pool import proxy_pool
 
 # 配置日志
 logger = logging.getLogger(__name__)
+
+# 全局限流器实例
+_rate_limiter: Optional[RateLimiter] = None
 
 # 全局变量，用于持久化浏览器实例
 _playwright: Optional[Playwright] = None
@@ -46,7 +51,16 @@ celery_app.conf.update(
 
 async def _init_browser():
     """初始化全局浏览器实例"""
-    global _playwright, _browser
+    global _playwright, _browser, _rate_limiter
+    
+    # 初始化限流器
+    if _rate_limiter is None:
+        try:
+            _rate_limiter = RateLimiter(worker_config.CELERY_BROKER_URL)
+            logger.info("限流器初始化完成")
+        except Exception as e:
+            logger.error(f"限流器初始化失败: {e}")
+
     if _browser is None:
         logger.info("正在初始化全局 Playwright 浏览器实例...")
         _playwright = await async_playwright().start()
@@ -132,17 +146,38 @@ async def _crawl_page_async(
         await _init_browser()
         if _browser is None:
              raise RuntimeError("无法初始化 Playwright 浏览器")
+    
+    # 执行速率限制检查
+    if _rate_limiter:
+        # 默认每分钟 60 次，可从 options 覆盖
+        limit = options.get("rate_limit", worker_config.RATE_LIMIT_PER_MINUTE) if hasattr(worker_config, "RATE_LIMIT_PER_MINUTE") else 60
+        # 阻塞等待直到允许请求
+        _rate_limiter.wait_if_needed(url, limit=limit)
 
     # 配置代理
+    # 优先级: options指定 > 环境变量单代理 > 代理池
     proxy = None
-    if options.get("proxy") or worker_config.PROXY_URL:
+    if options.get("proxy"):
+        # 如果 options 直接提供了代理字符串，解析它
+        proxy_str = options.get("proxy")
+        if isinstance(proxy_str, str):
+            proxy = proxy_pool._parse_proxy(proxy_str)
+        else:
+            proxy = proxy_str
+    elif worker_config.PROXY_URL:
+        # 使用旧的单代理配置
         proxy_config = {
-            "server": options.get("proxy") or worker_config.PROXY_URL
+            "server": worker_config.PROXY_URL
         }
         if worker_config.PROXY_USERNAME and worker_config.PROXY_PASSWORD:
             proxy_config["username"] = worker_config.PROXY_USERNAME
             proxy_config["password"] = worker_config.PROXY_PASSWORD
         proxy = proxy_config
+    else:
+        # 尝试从代理池获取
+        proxy = proxy_pool.get_proxy()
+        if proxy:
+            logger.debug(f"使用代理池代理: {proxy.get('server')}")
     
     # User-Agent 配置
     user_agent = options.get("user_agent")
