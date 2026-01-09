@@ -102,3 +102,4 @@ async def inject_cdp_fingerprint(page, options: Optional[Dict[str, Any]] = None)
     except Exception as e:
         logger.warning(f"CDP 指纹注入失败: {str(e)}")
 
+

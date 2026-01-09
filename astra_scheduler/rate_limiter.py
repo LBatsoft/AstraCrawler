@@ -78,3 +78,4 @@ class RateLimiter:
         while not self.is_allowed(url, limit, window):
             time.sleep(1)
 
+
