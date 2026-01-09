@@ -9,6 +9,7 @@ import json
 import logging
 from typing import Dict, Set, Optional
 import websockets
+from websockets.server import WebSocketServerProtocol
 try:
     from websockets.server import serve
 except ImportError:

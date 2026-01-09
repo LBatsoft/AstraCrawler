@@ -1,4 +1,16 @@
-# 爬虫工作节点 (Worker) 规范
+---
+title: 爬虫工作节点 (Worker)
+status: complete
+priority: high
+assignee: morein
+created: 2025-01-27T10:00:00Z
+tags:
+  - playwright
+  - crawling
+  - anti-bot
+---
+
+# 爬虫工作节点 (Worker)
 
 ## 1. 核心功能
 
@@ -13,7 +25,7 @@
 ### 1.2 反爬虫机制
 - **场景**: 访问受保护的目标网站
 - **行为**:
-  - 加载自定义 Chromium 内核 (如配置)。
+  - 加载自定义 Chromium 内核 (通过 `BROWSER_EXECUTABLE_PATH` 配置)。
   - 注入 CDP 指纹 (User-Agent, WebGL, Canvas)。
   - 启用 `playwright-stealth`。
   - 禁用 `AutomationControlled` 特征。
@@ -37,4 +49,3 @@
 ### 2.2 速率限制
 - **场景**: 触发本地限流
 - **行为**: 阻塞等待，直到获得令牌，再发起请求。
-

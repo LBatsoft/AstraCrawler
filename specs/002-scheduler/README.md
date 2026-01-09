@@ -1,4 +1,16 @@
-# 调度中心 (Scheduler) 规范
+---
+title: 调度中心 (Scheduler)
+status: complete
+priority: high
+assignee: morein
+created: 2025-01-27T10:00:00Z
+tags:
+  - api
+  - celery
+  - redis
+---
+
+# 调度中心 (Scheduler)
 
 ## 1. API 接口
 
@@ -25,4 +37,3 @@
   - 如果未超过，记录当前请求时间戳。
 - **验证**:
   - 高并发下，每分钟实际请求数不超过配置值 (默认 60)。
-

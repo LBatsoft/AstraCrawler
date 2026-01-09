@@ -136,7 +136,8 @@ async def _crawl_page_async(
     Returns:
         包含 URL、HTML 内容和其他元信息的字典
     """
-    global _browser
+    # 移除 global _browser，因为不需要在函数内重新赋值
+    # _browser 已经在模块级别定义，且只读访问不需要 global
     
     options = options or {}
     hook_scripts = hook_scripts or []

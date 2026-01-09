@@ -1,4 +1,16 @@
-# 数据处理 (Dataflow) 规范
+---
+title: 数据处理 (Dataflow)
+status: complete
+priority: medium
+assignee: morein
+created: 2025-01-27T10:00:00Z
+tags:
+  - pipeline
+  - storage
+  - jsonl
+---
+
+# 数据处理 (Dataflow)
 
 ## 1. 数据管道
 
@@ -18,4 +30,3 @@
   - 文件存在。
   - 文件内容为有效的 JSON Lines 格式。
   - 数据字段完整。
-
