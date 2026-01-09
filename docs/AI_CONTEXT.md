@@ -20,6 +20,17 @@
 
 ## 2. 当前开发状态
 
+### 最近变更 (feat/antibot-enhanced)
+已完成反爬能力增强：
+1.  **动态指纹库**:
+    -   新增 `fingerprints.py`，提供多套真实的指纹数据（Windows/Mac/Linux，High/Mid End）。
+    -   升级 `cdp_fingerprint.py`，自动注入与 User-Agent 逻辑一致的 `hardwareConcurrency`, `deviceMemory`, `screen`, `WebGL Vendor` 等特征。
+    -   受影响文件: `astra_farm/workers/fingerprints.py`, `astra_farm/workers/cdp_fingerprint.py`
+2.  **拟人化行为**:
+    -   新增 `human_behavior.py`，实现基于贝塞尔曲线的鼠标移动和随机滚动。
+    -   在 Worker 中集成，可通过 `options.human_behavior=True` 开启。
+    -   受影响文件: `astra_farm/workers/human_behavior.py`, `astra_farm/workers/playwright_worker.py`
+
 ### 最近变更 (feat/rate-limit-proxy)
 已完成流控与代理池功能：
 1.  **速率限制 (Rate Limiting)**:

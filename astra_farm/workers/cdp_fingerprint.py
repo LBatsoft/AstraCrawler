@@ -11,6 +11,7 @@ CDP (Chrome DevTools Protocol) 指纹注入模块
 import random
 import logging
 from typing import Dict, Any, Optional
+from .fingerprints import get_random_fingerprint
 
 logger = logging.getLogger(__name__)
 
@@ -25,24 +26,36 @@ async def inject_cdp_fingerprint(page, options: Optional[Dict[str, Any]] = None)
     options = options or {}
     
     try:
+        # 获取指纹配置
+        # 如果 options 中指定了 ua，则优先使用（但可能导致不一致风险）
+        # 推荐使用 get_random_fingerprint 获取完整一致的指纹
+        fp = get_random_fingerprint()
+        
+        # 如果 options 强行指定了 ua，则覆盖指纹库中的 ua (仅做兼容，不推荐)
+        if options.get("user_agent"):
+            fp["ua"] = options.get("user_agent")
+            
         # 获取 CDP 会话
         client = await page.context.new_cdp_session(page)
         
         # 1. 覆盖 User-Agent 和 Client Hints
-        # 注意：这里需要与 context 的 user_agent 保持一致
-        ua = options.get("user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-        platform = "Windows" if "Windows" in ua else ("MacIntel" if "Mac" in ua else "Linux x86_64")
+        ua = fp["ua"]
+        platform = fp["platform"]
+        
+        # 构造 UserAgentMetadata
+        # 这里简化处理，根据 UA 推断版本，实际应存储在数据库中
+        brands = [
+            {"brand": "Google Chrome", "version": "120"},
+            {"brand": "Chromium", "version": "120"},
+            {"brand": "Not?A_Brand", "version": "24"}
+        ]
         
         await client.send("Network.setUserAgentOverride", {
             "userAgent": ua,
             "platform": platform,
             "acceptLanguage": "en-US,en;q=0.9",
             "userAgentMetadata": {
-                "brands": [
-                    {"brand": "Google Chrome", "version": "120"},
-                    {"brand": "Chromium", "version": "120"},
-                    {"brand": "Not?A_Brand", "version": "24"}
-                ],
+                "brands": brands,
                 "fullVersion": "120.0.6099.109",
                 "platform": platform,
                 "platformVersion": "10.0.0",
@@ -52,7 +65,28 @@ async def inject_cdp_fingerprint(page, options: Optional[Dict[str, Any]] = None)
             }
         })
         
-        # 2. 注入 Canvas 噪声 (通过 JS 注入，但模拟底层行为)
+        # 2. 覆盖硬件并发数 (Hardware Concurrency) 和 内存
+        # 需要通过 JS 注入覆盖 navigator 属性
+        await page.add_init_script(f"""
+        (() => {{
+            Object.defineProperty(navigator, 'hardwareConcurrency', {{ get: () => {fp['hardwareConcurrency']} }});
+            Object.defineProperty(navigator, 'deviceMemory', {{ get: () => {fp['deviceMemory']} }});
+        }})();
+        """)
+        
+        # 3. 覆盖屏幕分辨率
+        width = fp["screen"]["width"]
+        height = fp["screen"]["height"]
+        await page.add_init_script(f"""
+        (() => {{
+            Object.defineProperty(screen, 'width', {{ get: () => {width} }});
+            Object.defineProperty(screen, 'height', {{ get: () => {height} }});
+            Object.defineProperty(screen, 'availWidth', {{ get: () => {width} }});
+            Object.defineProperty(screen, 'availHeight', {{ get: () => {height - 40} }}); // 减去任务栏
+        }})();
+        """)
+
+        # 4. 注入 Canvas 噪声 (通过 JS 注入，但模拟底层行为)
         # 真正的底层 Canvas 修改需要编译 Chromium，这里使用高级 JS Hook 模拟
         await page.add_init_script("""
         (() => {
@@ -79,25 +113,28 @@ async def inject_cdp_fingerprint(page, options: Optional[Dict[str, Any]] = None)
         })();
         """)
         
-        # 3. WebGL Vendor 覆盖
-        await page.add_init_script("""
-        (() => {
+        # 5. WebGL Vendor 覆盖
+        vendor = fp.get("vendor", "Google Inc. (Intel)")
+        renderer = fp.get("renderer", "ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)")
+        
+        await page.add_init_script(f"""
+        (() => {{
             const getParameter = WebGLRenderingContext.prototype.getParameter;
-            WebGLRenderingContext.prototype.getParameter = function(parameter) {
+            WebGLRenderingContext.prototype.getParameter = function(parameter) {{
                 // UNMASKED_VENDOR_WEBGL
-                if (parameter === 37445) {
-                    return 'Intel Inc.';
-                }
+                if (parameter === 37445) {{
+                    return '{vendor}';
+                }}
                 // UNMASKED_RENDERER_WEBGL
-                if (parameter === 37446) {
-                    return 'Intel(R) Iris(R) Xe Graphics';
-                }
+                if (parameter === 37446) {{
+                    return '{renderer}';
+                }}
                 return getParameter.apply(this, [parameter]);
-            };
-        })();
+            }};
+        }})();
         """)
         
-        logger.debug("CDP 指纹注入完成")
+        logger.debug(f"CDP 指纹注入完成: {fp['os']} ({width}x{height})")
         
     except Exception as e:
         logger.warning(f"CDP 指纹注入失败: {str(e)}")

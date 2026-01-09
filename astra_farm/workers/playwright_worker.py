@@ -19,6 +19,7 @@ except ImportError:
 
 from ..config import worker_config
 from .cdp_fingerprint import inject_cdp_fingerprint
+from .human_behavior import human_like_interaction
 from astra_scheduler.rate_limiter import RateLimiter
 from astra_farm.proxy_pool import proxy_pool
 
@@ -240,6 +241,10 @@ async def _crawl_page_async(
                 logger.debug(f"已等待选择器: {wait_for_selector}")
             except Exception as e:
                 logger.warning(f"等待选择器超时: {wait_for_selector}, error: {str(e)}")
+        
+        # 执行拟人化行为 (如果是反爬严格的站点，建议开启)
+        if options.get("human_behavior", False):
+            await human_like_interaction(page)
         
         # 获取页面内容
         html_content = await page.content()
