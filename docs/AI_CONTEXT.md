@@ -20,6 +20,14 @@
 
 ## 2. 当前开发状态
 
+### 最近变更 (feat/ci-cd)
+已完成 CI/CD 流水线配置：
+1.  **GitHub Actions**:
+    -   创建 `.github/workflows/python-app.yml`。
+    -   **CI**: 自动运行 `flake8` 代码检查和 `pytest` 单元测试（排除集成测试）。
+    -   **Build**: 自动验证 Docker 镜像构建。
+    -   受影响文件: `.github/workflows/python-app.yml`
+
 ### 最近变更 (feat/antibot-enhanced)
 已完成反爬能力增强：
 1.  **动态指纹库**:
@@ -81,7 +89,7 @@
 - [x] **流控与代理**: 实现请求速率限制和代理池轮换。
 
 #### 低优先级 / 运维
-- [ ] **CI/CD**: 添加 GitHub Actions 配置文件。
+- [x] **CI/CD**: 添加 GitHub Actions 配置文件。
 - [ ] **许可证**: 添加 LICENSE 文件。
 - [ ] **监控告警**: 集成 Prometheus/Grafana。
 
